@@ -84,7 +84,7 @@ erDiagram
 
 | Атрибут | Описание |
 |---|---|
-| `tenantId`, `sectionId` | |
+| `sectionId` | |
 | `slug` | Часть URL, уникален в пределах раздела |
 | `title` | Заголовок |
 | `dateStatementId` | Ссылка на `DateStatement` (см. раздел 4) |
