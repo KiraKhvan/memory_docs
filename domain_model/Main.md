@@ -43,7 +43,7 @@ erDiagram
 
 ### Служебные поля
 
-Есть у сущностей `Tenant`, `Section`, `Item`, `Content`, `MediaAsset`, `MediaVariant`, `DateStatement`. В таблицах ниже они сведены в одну строку.
+Есть у сущностей `Tenant`, `Subject`, `Section`, `Item`, `Content`, `MediaAsset`, `MediaVariant`, `DateStatement`. В таблицах ниже они сведены в одну строку.
 
 | Атрибут | Описание |
 |---|---|
@@ -80,6 +80,7 @@ erDiagram
 | `shortBio` | Краткая справка |
 | `portraitMediaAssetId` | Портрет для шапки мемориала |
 | `position` | Порядок, если субъектов несколько |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### TenantHost
 
