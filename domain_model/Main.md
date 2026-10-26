@@ -2,7 +2,7 @@
 
 **Версия:** 0.1 (черновик)
 **Дата:** 2026-10-23
-**Основано на:** scope v0.4, ADR-0001 (мультитенантность), ADR-0002 (резолвинг по хосту), ADR-0003 (фасетная разметка)
+**Основано на:** ADR-0001 (мультитенантность), ADR-0002 (резолвинг по хосту), ADR-0003 (фасетная разметка)
 
 Модель концептуальная: сущности, атрибуты и связи предметной области. Типы полей, индексы и внешние ключи определяются позже, при проектировании схемы БД.
 
@@ -13,39 +13,44 @@
 ```mermaid
 erDiagram
     Tenant ||--o{ TenantHost : "доступен по"
+    Tenant ||--|| TenantAppearance : "оформление"
     Tenant ||--o{ Subject : "посвящён"
-    Tenant ||--o| TenantAppearance : "оформление"
-    TenantAppearance ||--o| MediaAsset : "обложка"
     Tenant ||--o{ Section : "содержит"
-    Tenant ||--o{ Facet : "владеет словарём"
+    Tenant ||--o{ MediaAsset : "медиатека"
+    Tenant ||--o{ Facet : "словарь разметки"
     Tenant ||--o{ Membership : "участники"
-    Tenant ||--o{ Tribute : "памятная книга"
     Tenant ||--o{ AccessRequest : "запросы доступа"
+    Tenant ||--o{ Tribute : "памятная книга"
+
+    TenantAppearance }o--o| MediaAsset : "обложка"
+    Subject }o--o| MediaAsset : "портрет"
+    Subject ||--o| DateStatement : "дата рождения"
+    Subject ||--o| DateStatement : "дата смерти"
 
     Section ||--o{ Section : "вложенные разделы"
     Section ||--o{ Item : "содержит"
     Item ||--o{ Content : "упорядоченный список"
-    Content ||--o{ ContentTag : "размечен"
-    Content ||--o{ VisibilityDecision : "история публичности"
-    Content ||--o{ FieldProvenance : "происхождение полей"
-    Content ||--o| MediaAsset : "медиа"
     Item ||--o| DateStatement : "датировка"
     Content ||--o| DateStatement : "датировка"
+    Content }o--o| MediaAsset : "фото, аудио, видео"
+    Content ||--o{ ContentTag : "размечен"
+    Content ||--o{ FieldProvenance : "происхождение полей"
+    Content ||--o{ VisibilityDecision : "история публичности"
 
     MediaAsset ||--o{ MediaVariant : "версии файла"
 
     Facet ||--o{ Tag : "значения"
-    Tag ||--o{ ContentTag : ""
+    Tag ||--o{ ContentTag : "применён"
 
     Person ||--o{ AuthIdentity : "способы входа"
     Person ||--o{ Membership : "участие"
-    Person ||--o{ Tribute : "автор"
     Person ||--o{ AccessRequest : "заявитель"
+    Person ||--o{ Tribute : "автор"
 ```
 
 ### Служебные поля
 
-Есть у сущностей `Tenant`, `Subject`, `TenantAppearance`, `Section`, `Item`, `Content`, `MediaAsset`, `MediaVariant`, `DateStatement`. В таблицах ниже они сведены в одну строку.
+Есть у каждой сущности модели. В таблицах ниже они сведены в одну строку.
 
 | Атрибут | Описание |
 |---|---|
@@ -122,6 +127,7 @@ erDiagram
 | `tenantId` | |
 | `isPrimary` | Используется для генерации абсолютных ссылок |
 | `verifiedAt` | Момент подтверждения владения доменом |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ---
 
@@ -138,11 +144,11 @@ erDiagram
 | `id` | |
 | `displayName` | Имя из профиля провайдера |
 | `avatarUrl` | |
-| `createdAt` | |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### AuthIdentity
 
-Способ входа. Реализует абстракцию `AuthProvider` из scope: VK и Telegram — две записи одного вида.
+Способ входа. VK и Telegram — две записи одного вида.
 
 | Атрибут | Описание |
 |---|---|
@@ -150,6 +156,7 @@ erDiagram
 | `provider` | `VK` / `TELEGRAM` |
 | `externalId` | Идентификатор в системе провайдера |
 | `linkedAt` | |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Уникальность по паре (`provider`, `externalId`). Один человек может привязать несколько способов входа к одной учётной записи.
 
@@ -164,6 +171,7 @@ erDiagram
 | `role` | `OWNER` / `RELATIVE` |
 | `grantedByPersonId` | Кто выдал |
 | `grantedAt` | |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Роль `GUEST` в модели отсутствует: гость — это отсутствие членства, а не запись о нём.
 
@@ -177,6 +185,7 @@ erDiagram
 | `message` | Кем приходится, от заявителя |
 | `status` | `PENDING` / `APPROVED` / `REJECTED` |
 | `decidedByPersonId`, `decidedAt` | |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ---
 
@@ -218,7 +227,7 @@ erDiagram
 
 ### Content
 
-Единица контента внутри `Item`. Общий тип для всех видов контента — обеспечивает требование расширяемости из scope: разметка, видимость, история решений и API работают с `Content`, а не с четырьмя параллельными сущностями.
+Единица контента внутри `Item`. Общий тип для всех видов контента — обеспечивает расширяемость: разметка, видимость, история решений и API работают с `Content`, а не с пятью параллельными сущностями.
 
 **Общие атрибуты:**
 
@@ -285,7 +294,7 @@ erDiagram
 
 ### 4.1 Особенности аудио и видео
 
-**Аудио входит в первый релиз, видео — нет.** Модель поддерживает оба типа; различие в сроках, не в структуре. Оба вписываются без структурных изменений — `Section`, `Item`, `Content`, разметка и видимость работают с ними так же, как с фотографиями.
+**Аудио и видео поддерживаются наравне с фото.** Оба вписываются без структурных изменений — `Section`, `Item`, `Content`, разметка и видимость работают с ними так же, как с фотографиями.
 
 **Подготовка воспроизводимых версий — вне системы.** Приложение принимает файлы, готовые к воспроизведению, и не обрабатывает медиа. Фоновая обработка, очереди и воркеры в архитектуре не появляются.
 
@@ -303,7 +312,7 @@ erDiagram
 
 ### DateStatement
 
-Датировка как отдельная сущность. На неё ссылаются `Item` и `Content` через `dateStatementId`. Каждая запись принадлежит ровно одному владельцу и не разделяется между сущностями.
+Датировка как отдельная сущность. На неё ссылаются `Item` и `Content` через `dateStatementId`, `Subject` — через `bornOn` и `diedOn`. Каждая запись принадлежит ровно одному владельцу и не разделяется между сущностями.
 
 | Атрибут | Описание |
 |---|---|
@@ -345,10 +354,11 @@ erDiagram
 | Атрибут | Описание |
 |---|---|
 | `tenantId`, `contentId` | |
-| `fieldName` | Какое поле описывается: `dateStatementId`, `place`, `title`, `transcript` и т.д. |
+| `fieldName` | Какое поле описывается: `dateStatementId`, `place`, `title` и т.д. |
 | `source` | Значение из перечисления выше |
 | `confirmedByPersonId`, `confirmedAt` | Пусто, если не подтверждено |
 | `evidence` | Основание: «подпись на обороте: Алтай, лето», «по дате соседних кадров» |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Отсутствие записи означает, что происхождение неизвестно — это допустимое состояние, а не ошибка.
 
@@ -388,6 +398,7 @@ erDiagram
 | `isSingleValue` | Допустимо ли одно значение на единицу контента |
 | `applicableTypes` | Типы контента, к которым применим |
 | `position` | Порядок в интерфейсе фильтров |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### Tag
 
@@ -399,10 +410,18 @@ erDiagram
 | `title` | Отображаемое имя |
 | `normalizedTitle` | Для контроля дубликатов, уникально в пределах фасета |
 | `position` | |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### ContentTag
 
 Связь контента с тегом. Ограничение единственности из `Facet.isSingleValue` проверяется на этом уровне.
+
+| Атрибут | Описание |
+|---|---|
+| `tenantId`, `contentId`, `tagId` | |
+| `source` | Откуда взята разметка (раздел 6.1) |
+| `confirmedByPersonId`, `confirmedAt` | Пусто, если не подтверждена |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ---
 
@@ -410,7 +429,7 @@ erDiagram
 
 ### VisibilityDecision
 
-Реализует требование из scope 6.3: решение о публичности фиксируется как событие, а не как перезапись поля.
+Решение о публичности фиксируется как событие, а не как перезапись поля.
 
 | Атрибут | Описание |
 |---|---|
@@ -418,6 +437,7 @@ erDiagram
 | `fromVisibility`, `toVisibility` | |
 | `decidedByPersonId`, `decidedAt` | |
 | `note` | Пояснение, если нужно |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Текущее значение `Content.visibility` остаётся денормализованным для скорости выборок; `VisibilityDecision` даёт историю. Механизм согласования между родственниками надстраивается поверх этой истории без изменения структуры.
 
@@ -435,7 +455,7 @@ erDiagram
 | `authorPersonId` | |
 | `body` | Текст воспоминания |
 | `status` | `PUBLISHED` / `HIDDEN` |
-| `createdAt`, `updatedAt` | |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Скрытие выполняет владелец. Удаление не предусмотрено: `HIDDEN` сохраняет запись.
 
@@ -450,7 +470,7 @@ erDiagram
 | Наследование `Content` в БД | Joined: таблица общих полей плюс таблицы специфичных |
 | Привязка `Tribute` к единице контента | Возможна, вынесена в поздние релизы |
 | Даты жизни | Отдельная сущность `Subject`, допускает нескольких субъектов на мемориал |
-| Аудио и видео в v1 | Аудио входит, видео — нет |
+| Аудио и видео | Поддерживаются наравне с фото |
 | Подготовка воспроизводимых версий | Вне системы, приложение медиа не обрабатывает |
 | Вложенность разделов | Разделы образуют дерево: `Section.parentSectionId` |
 | Тип контента в разделе | Раздел не ограничивает типы: в одном разделе допустимы элементы разных типов |
@@ -460,7 +480,7 @@ erDiagram
 | Контейнер единиц контента | `Item` в разделе, внутри — упорядоченный список `Content` разных типов |
 | Представление раздела | `Section.layout` (`LIST` / `GRID` / `CONTINUOUS`) и `Section.defaultOrdering` (`MANUAL` / `DATE_ASC` / `DATE_DESC` / `TITLE`) |
 | Человекочитаемые URL | `Item.slug`, уникален в пределах раздела |
-| Датировка | Отдельная сущность `DateStatement`, у каждой записи ровно один владелец (`Item` или `Content`) |
+| Датировка | Отдельная сущность `DateStatement`, у каждой записи ровно один владелец (`Item`, `Content` или `Subject`) |
 
 ---
 
@@ -471,8 +491,8 @@ erDiagram
 | ADR-0001: `tenant_id` везде | Все сущности тенант-скоупные, кроме `Person` и `AuthIdentity` — исключение обосновано в разделе 3 |
 | ADR-0002: резолвинг по хосту | `TenantHost` с уникальным `host` по всей платформе |
 | ADR-0003: фасетный словарь | `Facet` / `Tag` / `ContentTag`, словарь принадлежит тенанту |
-| Scope 6.2: дефолт `DRAFT` | Значение по умолчанию у `Content.visibility` |
-| Scope 6.3: история решений | `VisibilityDecision` как отдельная сущность |
+| Публикация — осознанное действие | `DRAFT` по умолчанию у `Content.visibility` |
+| История решений о публичности | `VisibilityDecision` как отдельная сущность |
 | NFR: оригиналы не удаляются | `MediaVariant.kind = ORIGINAL` не подлежит удалению; производные пересоздаваемы |
 | Расширяемость типов контента | Дискриминатор `Content.type`; новый тип не требует новых связей для разметки и видимости |
 | Вложенные разделы | `Section.parentSectionId` |
