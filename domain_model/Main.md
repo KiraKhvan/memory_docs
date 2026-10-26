@@ -50,6 +50,8 @@ erDiagram
     Tag ||--o{ ContentTag : "применён"
 
     Person ||--o{ AuthIdentity : "способы входа"
+    Person ||--o{ ApiToken : "токены агентов"
+    Tenant ||--o{ ApiToken : "действует в"
     Person ||--o{ Membership : "участие"
     Person ||--o{ AudienceMember : "входит"
     Audience ||--o{ AudienceMember : "состав"
@@ -67,6 +69,7 @@ erDiagram
 |---|---|
 | `version` | Номер версии записи, растёт при каждом изменении. Историю прежних значений не хранит |
 | `createdAt`, `updatedAt` | Когда запись создана и когда изменена в последний раз |
+| `createdByApiTokenId`, `updatedByApiTokenId` | Через какой токен агента сделано действие (`ApiToken`, раздел 3 основного документа); пусто, если человек действовал сам. Вместе с `…ByPersonId` дают «Агент Киры от имени Киры» |
 | `createdByPersonId`, `updatedByPersonId` | Кто создал и кто изменил в последний раз. Ссылаются на `Person`; пусто, если действие выполнила система |
 | `deletedAt` | Момент мягкого удаления, пусто, пока запись не удалена. Запись скрывается, но физически не стирается; оригиналы медиа не удаляются в любом случае (NFR по сохранности) |
 
@@ -89,7 +92,7 @@ erDiagram
 | `originalAudiences` | Кто может скачивать оригиналы медиафайлов и видеть их полные технические метаданные: аудитории, по умолчанию «Только владельцы» (раздел 8) |
 | `accessContact` | Контакт хранителя (владельца) для гостей закрытого мемориала: что владелец сам решил показать — Telegram, телефон, почта. Простой текст, может отсутствовать. Виден гостю, даже когда мемориал закрыт (раздел 8.3) |
 | `searchIndexing` | Разрешить поисковикам показывать мемориал. По умолчанию — нет: страницы отдаются с `noindex`. Меняет владелец. Это просьба к поисковикам, а не защита — доступ ограничивают аудитории |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Вид мемориала задаётся явно, а не выводится из числа людей: семейный архив, где пока заведён один человек, остаётся семейным.
 
@@ -113,7 +116,7 @@ erDiagram
 | `portraitMediaAssetId` | Портрет для шапки мемориала |
 | `position` | Порядок, если субъектов несколько |
 | `audiences` | Кто видит: одна или несколько аудиторий (раздел 8). Видят те, кого пропускают все звенья цепочки «мемориал → человек». По умолчанию «Все»: пока закрыт мемориал, человек тоже закрыт |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### TenantAppearance
 
@@ -128,7 +131,7 @@ erDiagram
 | `coverCropDesktop` | Кадр обложки на широком экране: прямоугольник `x`, `y`, `width`, `height` в долях от размеров оригинала (0–1), не выходит за изображение: `x + width ≤ 1`, `y + height ≤ 1`. Пусто — изображение целиком |
 | `coverCropPhone` | Кадр обложки на телефоне, в тех же долях |
 | `audiences` | Кто видит: одна или несколько аудиторий (раздел 8). Видят те, кого пропускают все звенья цепочки «мемориал → оформление». По умолчанию «Все»: пока закрыт мемориал, оформление тоже закрыто |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Кадр хранится в долях, а не в пикселях: при замене оригинала сканом крупнее он не сбивается. Клиент обрезает изображение по кадру сам — производные версии для обложки не нужны.
 
@@ -144,7 +147,7 @@ erDiagram
 | `tenantId` | |
 | `isPrimary` | Используется для генерации абсолютных ссылок |
 | `verifiedAt` | Момент подтверждения владения доменом |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ---
 
@@ -161,7 +164,7 @@ erDiagram
 | `id` | |
 | `displayName` | Имя из профиля провайдера |
 | `avatarUrl` | |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### AuthIdentity
 
@@ -173,9 +176,31 @@ erDiagram
 | `provider` | `VK` / `TELEGRAM` |
 | `externalId` | Идентификатор в системе провайдера |
 | `linkedAt` | |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Уникальность по паре (`provider`, `externalId`). Один человек может привязать несколько способов входа к одной учётной записи.
+
+### ApiToken
+
+Токен агента или MCP-сервера: секретный ключ, по которому программа обращается к API от имени человека. Выдаёт сам человек, в своём мемориале.
+
+| Атрибут | Описание |
+|---|---|
+| `tenantId` | Мемориал, в котором действует токен |
+| `personId` | От чьего имени действует |
+| `title` | Имя, под которым действия видны в истории: «Агент Киры» |
+| `tokenHash` | Хеш ключа; сам ключ показывается один раз при выдаче и не хранится |
+| `expiresAt` | До какого момента действует |
+| `revokedAt`, `revokedByPersonId` | Отзыв: человек или владелец мемориала может отозвать токен в любой момент |
+| `lastUsedAt` | Когда токен использовался последний раз |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
+
+**Права токена урезаны**: он может меньше, чем человек, который его выдал, и никогда больше.
+
+- Может: читать то, что видит человек; загружать медиафайлы; создавать посты и контент там, куда человеку разрешено добавлять; менять и удалять то, что создал этот же токен.
+- Не может: открывать контент другим — всё созданное токеном остаётся «Только владельцы», пока человек сам не откроет; менять аудитории, участников, права, настройки мемориала; трогать то, что создано не им.
+
+Каждое действие токена записывается в служебные поля как «человек + токен» (`…ByPersonId` и `…ByApiTokenId`): в истории видно, что сделал агент, а что — человек сам.
 
 ### Вход через общий домен
 
@@ -201,7 +226,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `grantedAt` | |
 | `invitationId`, `accessRequestId` | Как человек попал в мемориал: по приглашению или по одобренной заявке. Пусто у создателя мемориала |
 | `revokedAt`, `revokedByPersonId` | Отзыв доступа владельцем |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Роль `GUEST` в модели отсутствует: гость — это отсутствие членства, а не запись о нём.
 
@@ -218,7 +243,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `kind` | `SYSTEM` — есть у каждого мемориала, не удаляется и не редактируется; `CUSTOM` — создана владельцем |
 | `systemCode` | Для системных: `EVERYONE` — все, включая неавторизованных; `MEMBERS` — все участники мемориала; `OWNERS` — только владельцы. Состав системных аудиторий вычисляется, а не хранится |
 | `position` | Порядок в интерфейсе |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Вместе с мемориалом создаются системные аудитории и две обычные — «Семья» и «Друзья»; их можно переименовать, удалить, добавить свои.
 
@@ -230,7 +255,7 @@ VK и Telegram требуют заранее зарегистрировать а
 |---|---|
 | `tenantId`, `audienceId` | Кому выдано: всем участникам аудитории |
 | `sectionId` | Куда можно добавлять: раздел со всеми подразделами; пусто — весь мемориал |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Участник с правом:
 
@@ -248,7 +273,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | Атрибут | Описание |
 |---|---|
 | `tenantId`, `audienceId`, `personId` | |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### AccessRequest
 
@@ -260,7 +285,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `message` | Кем приходится, от заявителя |
 | `status` | `PENDING` / `APPROVED` / `REJECTED` |
 | `decidedByPersonId`, `decidedAt` | |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### Invitation
 
@@ -277,7 +302,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `expiresAt` | До какого момента ссылка действует; пусто — бессрочно |
 | `maxUses`, `usedCount` | Сколько человек может принять приглашение и сколько уже приняли; пусто в `maxUses` — без ограничения |
 | `revokedAt`, `revokedByPersonId` | Отзыв ссылки владельцем |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Приглашение даёт роль `MEMBER`. Приглашение в совладельцы — вместе с вопросом о преемственности (раздел 12).
 
@@ -300,7 +325,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `position` | Порядок отображения среди разделов одного родителя |
 | `layout` | Вид списка элементов: `LIST` / `GRID` / `CONTINUOUS` |
 | `defaultOrdering` | Порядок элементов по умолчанию: `MANUAL` / `DATE_ASC` / `DATE_DESC` / `TITLE` |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Раздел не ограничивает тип контента: в одном разделе могут лежать элементы разных типов (фото, стихи, аудио). Четыре раздела первого мемориала — четыре записи; два раздела с фотографиями (снимки автора и снимки с ним) различаются принадлежностью к разным разделам, а не отдельным типом сущности.
 
@@ -318,7 +343,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `dateStatementId` | Ссылка на `DateStatement` (см. раздел 5) |
 | `audiences` | Кто видит пост целиком: одна или несколько аудиторий, по умолчанию «Только владельцы». Звено цепочки «мемориал → разделы → пост → его контент» (раздел 8) |
 | `position` | Порядок отображения среди элементов одного раздела |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### Content
 
@@ -335,7 +360,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `audiences` | Кто видит: одна или несколько аудиторий, по умолчанию «Только владельцы» — публикация всегда осознанное действие. Видят те, кого пропускают все звенья цепочки «мемориал → разделы → пост → контент» (раздел 8) |
 | `dateStatementId` | Ссылка на `DateStatement` (см. раздел 5) |
 | `position` | Порядковый номер внутри `Item` |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 **Специфичные атрибуты по типам** (в БД — отдельные таблицы, связанные с таблицей общих полей: наследование joined):
 
@@ -363,7 +388,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `durationSeconds` | Только для аудио и видео |
 | `technicalMetadataJson` | Исходные метаданные целиком, как есть: EXIF для изображений, контейнер и кодеки для аудио и видео. Доступны тем, кому доступен оригинал |
 | `originalAudiences` | Кто может скачивать оригинал этого файла: аудитории; действует вместе с `Tenant.originalAudiences` (раздел 8) |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 **MediaVariant:**
 
@@ -374,7 +399,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `storageKey` | Ключ объекта в хранилище |
 | `width`, `height`, `sizeBytes`, `mimeType` | Размеры — только для визуальных вариантов |
 | `bitrate`, `codec` | Только для аудио и видео |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Назначение вариантов по типам:
 
@@ -415,7 +440,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `dateFrom`, `dateTo` | Границы интервала. Для точной даты совпадают |
 | `precision` | `DAY` / `MONTH` / `YEAR` / `DECADE` / `UNKNOWN` |
 | `displayText` | Как показывать: «1975», «конец 1970-х», «около 1980» |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Фильтрация по фасету «период» работает по пересечению интервала с границами периода, что корректно обрабатывает неточные датировки.
 
@@ -454,7 +479,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `source` | Значение из перечисления выше |
 | `confirmedByPersonId`, `confirmedAt` | Пусто, если не подтверждено |
 | `evidence` | Основание: «подпись на обороте: Алтай, лето», «по дате соседних кадров» |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Отсутствие записи означает, что происхождение неизвестно — это допустимое состояние, а не ошибка.
 
@@ -494,7 +519,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `isSingleValue` | Допустимо ли одно значение на единицу контента |
 | `applicableTypes` | Типы контента, к которым применим |
 | `position` | Порядок в интерфейсе фильтров |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### Tag
 
@@ -506,7 +531,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `title` | Отображаемое имя |
 | `normalizedTitle` | Для контроля дубликатов, уникально в пределах фасета |
 | `position` | |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### ContentTag
 
@@ -517,7 +542,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `tenantId`, `contentId`, `tagId` | |
 | `source` | Откуда взята разметка (раздел 6.1) |
 | `confirmedByPersonId`, `confirmedAt` | Пусто, если не подтверждена |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ---
 
@@ -580,7 +605,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `fromAudiences`, `toAudiences` | Наборы аудиторий до и после |
 | `decidedByPersonId`, `decidedAt` | |
 | `note` | Пояснение, если нужно |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Текущий набор аудиторий хранится у самого объекта (`audiences`, `originalAudiences`) для скорости выборок; `VisibilityDecision` даёт историю. Ссылка на объект — пара «тип и идентификатор»: целостность такой ссылки проверяет приложение, а не внешний ключ БД — плата за одну историю на все виды объектов. Механизм согласования между родственниками надстраивается поверх этой истории без изменения структуры.
 
@@ -599,7 +624,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | `body` | Текст воспоминания |
 | `status` | `PUBLISHED` / `HIDDEN` |
 | `audiences` | Кто видит (раздел 8), цепочка «мемориал → запись памятной книги». Выбирает автор записи из аудиторий мемориала: «Все», «Семья», «Друзья» и другие, созданные владельцем. По умолчанию «Все» — видна всем, кому виден мемориал |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Кому видна запись, решает её автор (**реализация — позже**: сначала записи видны всем, кому виден мемориал). Владелец может скрыть любую запись (`HIDDEN`). Удаление не предусмотрено: `HIDDEN` сохраняет запись.
 
@@ -637,6 +662,7 @@ VK и Telegram требуют заранее зарегистрировать а
 | Отзыв доступа | Доступ отбирается сразу, участие помечается отозванным; оставленное человеком остаётся |
 | Добавление контента участниками | Право выдаётся аудитории на мемориал или раздел (с подразделами); добавленное сразу видно, автор может сузить круг; менять и удалять можно только своё |
 | Способы входа | Только VK и Telegram (`AuthIdentity.provider`), через общий домен входа с передачей сессии на хост мемориала |
+| Агенты и MCP | `ApiToken` от имени человека, с урезанными правами: добавляет черновики, не публикует и не управляет; действия помечаются токеном |
 | Закрытый мемориал | Гость видит название, сообщение о закрытости, контакт хранителя и «Запросить доступ» (раздел 8.3) |
 
 ---

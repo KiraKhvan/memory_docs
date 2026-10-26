@@ -43,6 +43,7 @@ erDiagram
 |---|---|
 | `version` | Номер версии записи, растёт при каждом изменении. Историю прежних значений не хранит |
 | `createdAt`, `updatedAt` | Когда запись создана и когда изменена в последний раз |
+| `createdByApiTokenId`, `updatedByApiTokenId` | Через какой токен агента сделано действие (`ApiToken`, раздел 3 основного документа); пусто, если человек действовал сам. Вместе с `…ByPersonId` дают «Агент Киры от имени Киры» |
 | `createdByPersonId`, `updatedByPersonId` | Кто создал и кто изменил в последний раз. Ссылаются на `Person` из основного документа; пусто, если действие выполнила система |
 | `deletedAt` | Момент мягкого удаления, пусто, пока запись не удалена. Запись скрывается, но физически не стирается; оригиналы медиа не удаляются в любом случае (NFR по сохранности) |
 
@@ -65,7 +66,7 @@ erDiagram
 | `originalAudiences` | Кто может скачивать оригиналы медиафайлов и видеть их полные технические метаданные: аудитории, по умолчанию «Только владельцы» (раздел 8 основного документа) |
 | `accessContact` | Контакт хранителя (владельца) для гостей закрытого мемориала: что владелец сам решил показать — Telegram, телефон, почта. Простой текст, может отсутствовать. Виден гостю, даже когда мемориал закрыт (раздел 8.3 основного документа) |
 | `searchIndexing` | Разрешить поисковикам показывать мемориал. По умолчанию — нет: страницы отдаются с `noindex`. Меняет владелец. Это просьба к поисковикам, а не защита — доступ ограничивают аудитории |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Вид мемориала задаётся явно, а не выводится из числа людей: семейный архив, где пока заведён один человек, остаётся семейным.
 
@@ -89,7 +90,7 @@ erDiagram
 | `portraitMediaAssetId` | Портрет для шапки мемориала |
 | `position` | Порядок, если субъектов несколько |
 | `audiences` | Кто видит: одна или несколько аудиторий (раздел 8 основного документа). Видят те, кого пропускают все звенья цепочки «мемориал → человек». По умолчанию «Все»: пока закрыт мемориал, человек тоже закрыт |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### TenantAppearance
 
@@ -104,7 +105,7 @@ erDiagram
 | `coverCropDesktop` | Кадр обложки на широком экране: прямоугольник `x`, `y`, `width`, `height` в долях от размеров оригинала (0–1), не выходит за изображение: `x + width ≤ 1`, `y + height ≤ 1`. Пусто — изображение целиком |
 | `coverCropPhone` | Кадр обложки на телефоне, в тех же долях |
 | `audiences` | Кто видит: одна или несколько аудиторий (раздел 8 основного документа). Видят те, кого пропускают все звенья цепочки «мемориал → оформление». По умолчанию «Все»: пока закрыт мемориал, оформление тоже закрыто |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Кадр хранится в долях, а не в пикселях: при замене оригинала сканом крупнее он не сбивается. Клиент обрезает изображение по кадру сам — производные версии для обложки не нужны.
 
@@ -129,7 +130,7 @@ erDiagram
 | `position` | Порядок отображения среди разделов одного родителя |
 | `layout` | Вид списка элементов: `LIST` / `GRID` / `CONTINUOUS` |
 | `defaultOrdering` | Порядок элементов по умолчанию: `MANUAL` / `DATE_ASC` / `DATE_DESC` / `TITLE` |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Раздел не ограничивает тип контента: в одном разделе могут лежать элементы разных типов (фото, стихи, аудио). Четыре раздела первого мемориала — четыре записи; два раздела с фотографиями (снимки автора и снимки с ним) различаются принадлежностью к разным разделам, а не отдельным типом сущности.
 
@@ -147,7 +148,7 @@ erDiagram
 | `dateStatementId` | Ссылка на `DateStatement` (см. раздел 4) |
 | `audiences` | Кто видит пост целиком: одна или несколько аудиторий, по умолчанию «Только владельцы». Звено цепочки «мемориал → разделы → пост → его контент» (раздел 8 основного документа) |
 | `position` | Порядок отображения среди элементов одного раздела |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### Content
 
@@ -164,7 +165,7 @@ erDiagram
 | `audiences` | Кто видит: одна или несколько аудиторий, по умолчанию «Только владельцы» — публикация всегда осознанное действие. Видят те, кого пропускают все звенья цепочки «мемориал → разделы → пост → контент» (раздел 8 основного документа) |
 | `dateStatementId` | Ссылка на `DateStatement` (см. раздел 4) |
 | `position` | Порядковый номер внутри `Item` |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 **Специфичные атрибуты по типам** (в БД — отдельные таблицы, связанные с таблицей общих полей: наследование joined):
 
@@ -192,7 +193,7 @@ erDiagram
 | `durationSeconds` | Только для аудио и видео |
 | `technicalMetadataJson` | Исходные метаданные целиком, как есть: EXIF для изображений, контейнер и кодеки для аудио и видео. Доступны тем, кому доступен оригинал |
 | `originalAudiences` | Кто может скачивать оригинал этого файла: аудитории; действует вместе с `Tenant.originalAudiences` (раздел 8 основного документа) |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 **MediaVariant:**
 
@@ -203,7 +204,7 @@ erDiagram
 | `storageKey` | Ключ объекта в хранилище |
 | `width`, `height`, `sizeBytes`, `mimeType` | Размеры — только для визуальных вариантов |
 | `bitrate`, `codec` | Только для аудио и видео |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 Назначение вариантов по типам:
 
@@ -228,4 +229,4 @@ erDiagram
 | `dateFrom`, `dateTo` | Границы интервала. Для точной даты совпадают |
 | `precision` | `DAY` / `MONTH` / `YEAR` / `DECADE` / `UNKNOWN` |
 | `displayText` | Как показывать: «1975», «конец 1970-х», «около 1980» |
-| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
+| `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
