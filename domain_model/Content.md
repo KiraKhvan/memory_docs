@@ -158,7 +158,7 @@ erDiagram
 | `type` | Дискриминатор: `POEM` / `PHOTO` / `BLOG_ENTRY` / `AUDIO` / `VIDEO` |
 | `title` | Может отсутствовать (безымянное стихотворение, фото) |
 | `description` | Комментарий владельца |
-| `visibility` | `PUBLIC` / `FAMILY` / `DRAFT`, по умолчанию `DRAFT`. Действует самое строгое значение по цепочке «мемориал → разделы → контент» (раздел 8 основного документа) |
+| `visibility` | `PUBLIC` / `FRIENDS` / `FAMILY` / `DRAFT`, по умолчанию `DRAFT`. Действует самое строгое значение по цепочке «мемориал → разделы → контент» (раздел 8 основного документа) |
 | `dateStatementId` | Ссылка на `DateStatement` (см. раздел 4) |
 | `position` | Порядковый номер внутри `Item` |
 | `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `deletedAt` | Служебные поля, см. раздел 1 |
