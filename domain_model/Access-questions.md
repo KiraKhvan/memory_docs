@@ -9,7 +9,7 @@
 ## Сервис авторизации
 
 ### 1. Граница сервиса
-В сервисе авторизации — `Person`, `AuthIdentity`, сессии, `ApiToken`; в gefest — `Membership`, `Audience`, `AccessGrant`. Так?
+В сервисе авторизации — `Person`, `AuthIdentity`, сессии, `ApiToken`; в gefest — `Membership`, `Audience`, `AudienceMember`, `AccessGrant`, `Invitation`, `AccessRequest`. Правило: «кто ты» — сервис авторизации, «что тебе можно в мемориале» — gefest. Так?
 
 **Ответ:** —
 
