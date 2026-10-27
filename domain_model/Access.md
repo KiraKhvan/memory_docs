@@ -91,7 +91,7 @@ erDiagram
 | `id` | |
 | `displayName` | Имя из профиля провайдера |
 | `avatarUrl` | |
-| `publicContact` | Публичный контакт: что человек сам решил показать — Telegram, телефон, почта, что угодно. Простой текст, может отсутствовать. Общий для всех мемориалов. Виден любому посетителю мемориала, где человек назначен хранителем (`Tenant.accessContactPersonId`), — даже без входа |
+| `publicContact` | Публичный контакт: всё, что человек сам укажет — Telegram, телефон, почта, что угодно. Простой текст, может отсутствовать. Из профиля VK или Telegram ничего не подставляется. Общий для всех мемориалов. Виден любому посетителю мемориала, где человек назначен хранителем (`Tenant.accessContactPersonId`), — даже без входа |
 | `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdByApiTokenId`, `updatedByApiTokenId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
 ### AuthIdentity
