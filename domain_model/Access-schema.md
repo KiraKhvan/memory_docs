@@ -11,7 +11,7 @@
 - У ролей и прав, кроме `id`, есть постоянный уникальный `code` (`OWNER`, `INVITE`): по нему роль или право ищет программа (решение 36).
 - Служебные поля у каждой таблицы бэк-сервиса, на схемах не показаны: `version`, `created_at`, `updated_at`, `created_by_person_id`, `updated_by_person_id` (→ `person_profile.id`), `created_via`, `updated_via` — канал: `SITE` / `TELEGRAM_BOT` / `VK_BOT` (решение 12а), `deleted_at`.
 - Таблицы мемориала содержат `tenant_id`, база прячет их строки от других мемориалов (RLS, ADR 0009). Ссылки внутри мемориала — составные (`tenant_id`, `x_id`): на запись чужого мемориала сослаться нельзя.
-- Как читать схему: `||--o{` — «один ко многим», `|o--o{` — «необязательно, один ко многим»; `PK` — ключ строки, `FK` — ссылка, `UK` — уникальное значение.
+- Как читать схему: `||--o{` — «один ко многим», `|o--o{` — «необязательно, один ко многим»; `PK` — ключ строки, `FK` — ссылка, `UK` — уникальное значение. Таблица из другого раздела показана коротко — только нужные столбцы, полностью — в своём разделе.
 
 ---
 
@@ -169,10 +169,13 @@ erDiagram
         timestamptz decided_at
     }
     person_profile {
-        uuid id PK
+        uuid id PK "полностью — раздел 2"
+        text display_name
     }
     role {
-        uuid id PK
+        uuid id PK "полностью — раздел 2"
+        text code UK "MODERATOR"
+        text scope "PLATFORM / MEMORIAL"
     }
 ```
 
@@ -225,13 +228,17 @@ erDiagram
         uuid audience_id FK
     }
     membership {
-        uuid id PK
+        uuid id PK "полностью — раздел 3"
+        uuid person_id FK
+        uuid role_id FK
     }
     permission {
-        uuid id PK
+        uuid id PK "полностью — раздел 2"
+        text code UK "VIEW"
+        text scope "PLATFORM / MEMORIAL / AUDIENCE"
     }
     invitation {
-        uuid id PK
+        uuid id PK "полностью — раздел 3"
     }
 ```
 
