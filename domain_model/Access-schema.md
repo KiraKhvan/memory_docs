@@ -8,6 +8,7 @@
 
 Соглашения — как в существующих миграциях бэк-сервиса (`0001-content-schema.sql`):
 - У каждой таблицы `id` — `uuid`, по умолчанию `uuidv7()`. Все ссылки между таблицами — по `id`.
+- Исключение из правила `uuid` — таблицы, которые создают фреймворки (`spring_session`, `oauth2_authorization`): их устройство задаёт фреймворк.
 - У ролей и прав, кроме `id`, есть постоянный уникальный `code` (`OWNER`, `INVITE`): по нему роль или право ищет программа (решение 36).
 - Служебные поля у каждой таблицы бэк-сервиса, на схемах не показаны: `version`, `created_at`, `updated_at`, `created_by_person_id`, `updated_by_person_id` (→ `person_profile.id`), `created_via`, `updated_via` — канал: `SITE` / `TELEGRAM_BOT` / `VK_BOT` (решение 12а), `deleted_at`.
 - Таблицы мемориала содержат `tenant_id`, база прячет их строки от других мемориалов (RLS, ADR 0009). Ссылки внутри мемориала — составные (`tenant_id`, `x_id`): на запись чужого мемориала сослаться нельзя.
@@ -17,11 +18,13 @@
 
 ## 1. Сервис авторизации
 
+Свои таблицы — `person` и `auth_identity`. Сессии и выданные ключи хранят стандартные таблицы Spring.
+
 ```mermaid
 erDiagram
     person ||--o{ auth_identity : "способы входа"
-    person ||--o{ auth_session : "входы"
-    auth_session ||--o{ oauth2_authorization : "ключи мемориалов"
+    person ||--o{ spring_session : "principal_name"
+    spring_session ||--o{ oauth2_authorization : "session_id"
     person {
         uuid id PK
         timestamptz created_at
@@ -35,16 +38,18 @@ erDiagram
         timestamptz created_at "привязан"
         timestamptz deleted_at "отвязан"
     }
-    auth_session {
-        uuid id PK
-        uuid person_id FK
-        timestamptz created_at
-        timestamptz last_activity_at "последнее продление"
-        timestamptz closed_at "нажали Выйти"
+    spring_session {
+        char primary_id PK "таблица Spring Session"
+        char session_id UK
+        text principal_name "person.id"
+        bigint last_access_time
+        int max_inactive_interval "час"
+        bigint expiry_time
     }
     oauth2_authorization {
-        text id PK "задаёт Spring Authorization Server"
-        uuid auth_session_id FK "наш столбец"
+        text id PK "таблица Spring Authorization Server"
+        text principal_name "person.id"
+        text session_id "наш столбец"
     }
 ```
 
@@ -52,8 +57,10 @@ erDiagram
 |---|---|---|
 | `person` | Номер человека. Этот же номер — `id` профиля в бэк-сервисе | |
 | `auth_identity` | Способ входа: VK или Telegram | Один и тот же VK — только у одного человека среди действующих: уникально (`provider`, `external_id`) где `deleted_at is null` (решения 5, 27). Нельзя отвязать последний способ входа — вопрос 46, не решён |
-| `auth_session` | Главный вход | Час без продлений — вход закрыт (решения 4, 31) |
-| `oauth2_authorization` | Пропуск (5 минут) и ключ продления (час), выданные бэк-сервису для сайта мемориала. Стандартная таблица Spring Authorization Server: её `id` — строка с UUID, задаёт Spring | Наш столбец `auth_session_id`: «Выйти» закрывает все ключи этого входа, продление обновляет `auth_session.last_activity_at` (решение 31) |
+| `spring_session` | Главный вход — сессия браузера на `auth.у-истока.рф`. Таблицу (и `spring_session_attributes`) создаёт Spring Session | `principal_name` — `person.id` (текст, не внешний ключ). Час без активности — вход закрыт (решения 4, 31). Продление пропуска в любом мемориале обновляет `last_access_time` этой сессии |
+| `oauth2_authorization` | Пропуск (JWT, 5 минут) и ключ продления (час, новый при каждом продлении), выданные бэк-сервису для сайта мемориала; пропуска бота. Стандартная таблица Spring Authorization Server | `principal_name` — `person.id`. Наш столбец `session_id` — сессия Spring, от которой выданы ключи: «Выйти» удаляет сессию и все ключи с её `session_id` (решения 4, 31) |
+
+Не нужны: `oauth2_registered_client` — клиентов два (бэк-сервис и бот), они в настройках; `oauth2_authorization_consent` — экрана согласия нет.
 
 ---
 
