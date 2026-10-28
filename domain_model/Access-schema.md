@@ -189,15 +189,12 @@ erDiagram
 
 ---
 
-## 4. Бэк-сервис: аудитории и выдачи
+## 4. Бэк-сервис: аудитории
 
 ```mermaid
 erDiagram
     audience ||--o{ audience_membership : "состав"
     membership ||--o{ audience_membership : "входит в"
-    audience ||--o{ access_grant : "получила"
-    permission ||--o{ access_grant : "право"
-    object_type ||--o{ access_grant : "тип объекта"
     invitation ||--o{ invitation_audience : "куда попадёт"
     audience ||--o{ invitation_audience : "в приглашениях"
     audience {
@@ -214,34 +211,16 @@ erDiagram
         uuid audience_id FK "Семья"
         uuid membership_id FK "Петя"
     }
-    access_grant {
-        uuid id PK
-        uuid tenant_id FK
-        uuid audience_id FK "Семья"
-        uuid permission_id FK "VIEW"
-        uuid object_type_id FK "SECTION"
-        uuid object_id "раздел Детство"
-    }
     invitation_audience {
         uuid id PK
         uuid tenant_id FK
         uuid invitation_id FK
         uuid audience_id FK
     }
-    object_type {
-        uuid id PK
-        text code UK "SECTION"
-        text title "Раздел"
-    }
     membership {
         uuid id PK "полностью — раздел 3"
         uuid person_id FK
         uuid role_id FK
-    }
-    permission {
-        uuid id PK "полностью — раздел 2"
-        text code UK "VIEW"
-        text scope "PLATFORM / MEMORIAL / AUDIENCE"
     }
     invitation {
         uuid id PK "полностью — раздел 3"
@@ -252,11 +231,70 @@ erDiagram
 |---|---|---|
 | `audience` | Аудитория: «Семья», «Друзья» и системные «Все» (`EVERYONE`), «Все участники» (`MEMBERS`), «Владелец и модераторы» (`OWNER_AND_MODERATORS`) | Системные есть у каждого мемориала, их состав вычисляется. Одна системная каждого вида: уникально (`tenant_id`, `system_code`) |
 | `audience_membership` | Кто входит в свою аудиторию: Петя в «Семье» | Уникально (`audience_id`, `membership_id`). Ссылается на участие, а не на человека (решение 24): отозвали участие — человек выпал из аудиторий. Только для своих аудиторий, состав системных не хранится |
-| `object_type` | Справочник типов объектов, на которые выдаются права: `TENANT` — мемориал, `SECTION` — раздел, `ITEM` — пост, `SUBJECT` — человек мемориала, `APPEARANCE` — оформление, `TRIBUTE` — запись памятной книги. Общий для всех мемориалов, без `tenant_id` | `code` постоянный и уникальный. Типы, о которых знает программа, создаёт миграция с постоянным `id` |
-| `access_grant` | Что аудитории разрешено на объект: «Семья — `VIEW` — раздел „Детство“» | Только права с пометкой `AUDIENCE` — проверяет код при записи. Уникально (`audience_id`, `permission_id`, `object_type_id`, `object_id`) где `deleted_at is null`. `object_id` проверяет приложение. Черновик — выдача `VIEW` аудитории «Владелец и модераторы», и она не сочетается с другими (решение 38). «Всем» нельзя `CONTRIBUTE` и `DOWNLOAD_ORIGINALS` (решение 17). `DOWNLOAD_ORIGINALS` — только на мемориал (решение 39) |
 | `invitation_audience` | В какие аудитории попадёт принявший приглашение (решение 25) | Уникально (`invitation_id`, `audience_id`). Удаляется вместе с аудиторией |
 
-Кроме того, у `media_asset` (есть) новое поле `original_closed` — «Оригинал закрыт», по умолчанию `false` (решение 39).
+---
+
+## 5. Бэк-сервис: права аудиторий
+
+Права аудиторий — строки общей таблицы `permission` (раздел 2) с пометкой `scope = AUDIENCE`. Отдельной таблицы прав для аудиторий нет: роли берут из `permission` права с пометками `PLATFORM` и `MEMORIAL`, выдачи аудиториям — с пометкой `AUDIENCE` (решение 41).
+
+```mermaid
+erDiagram
+    permission ||--o{ access_grant : "право"
+    object_type ||--o{ access_grant : "тип объекта"
+    audience ||--o{ access_grant : "получила"
+    permission {
+        uuid id PK "полностью — раздел 2"
+        text code UK "VIEW"
+        text scope "AUDIENCE"
+        text title "Видеть"
+    }
+    object_type {
+        uuid id PK
+        text code UK "SECTION"
+        text title "Раздел"
+    }
+    access_grant {
+        uuid id PK
+        uuid tenant_id FK
+        uuid audience_id FK "Семья"
+        uuid permission_id FK "VIEW"
+        uuid object_type_id FK "SECTION"
+        uuid object_id "раздел Детство"
+    }
+    audience {
+        uuid id PK "полностью — раздел 4"
+        text title "Семья"
+    }
+```
+
+**Права аудиторий** — строки `permission` с `scope = AUDIENCE`, их создаёт миграция:
+
+| `code` | `title` | На что выдаётся (`object_type`) | Правила |
+|---|---|---|---|
+| `VIEW` | Видеть | `TENANT`, `SECTION`, `ITEM`, `SUBJECT`, `APPEARANCE`, `TRIBUTE` | Внутри объекта — объединение аудиторий, по цепочке родителей — пересечение (раздел 8.1 `Access.md`). Черновик — `VIEW` для «Владелец и модераторы», не сочетается с другими (решение 38) |
+| `CONTRIBUTE` | Добавлять посты | `TENANT`, `SECTION` — с подразделами | Нужен и `VIEW` на тот же раздел (решение 15). «Всем» нельзя (решение 17) |
+| `DOWNLOAD_ORIGINALS` | Скачивать оригиналы | `TENANT` | «Всем» нельзя (решение 17). Отдельный файл закрывает флажок `media_asset.original_closed` (решение 39) |
+
+Какое право на какой тип объекта можно выдать, проверяет код при записи.
+
+| Таблица | Что хранит | Правила |
+|---|---|---|
+| `object_type` | Справочник типов объектов, на которые выдаются права: `TENANT` — мемориал, `SECTION` — раздел, `ITEM` — пост, `SUBJECT` — человек мемориала, `APPEARANCE` — оформление, `TRIBUTE` — запись памятной книги. Общий для всех мемориалов, без `tenant_id` | `code` постоянный и уникальный. Типы, о которых знает программа, создаёт миграция с постоянным `id` |
+| `access_grant` | Что аудитории разрешено на объект: «Семья — `VIEW` — раздел „Детство“» | Только права с пометкой `AUDIENCE` — проверяет код при записи. Уникально (`audience_id`, `permission_id`, `object_type_id`, `object_id`) где `deleted_at is null`. `object_id` проверяет приложение |
+| `media_asset` (есть) | Медиафайл | Новое поле `original_closed` — «Оригинал закрыт», по умолчанию `false`: оригинал скачивают только владелец и модераторы (решение 39) |
+
+**Пример — строки `access_grant` мемориала «Бабушка»** (для наглядности вместо `uuid` — названия):
+
+| Аудитория | Право | Тип объекта | Объект |
+|---|---|---|---|
+| Все | `VIEW` | `TENANT` | мемориал «Бабушка» |
+| Все | `VIEW` | `SECTION` | раздел «Детство» |
+| Семья | `VIEW` | `SECTION` | раздел «Последние годы» |
+| Семья | `CONTRIBUTE` | `SECTION` | раздел «Детство» |
+| Семья | `DOWNLOAD_ORIGINALS` | `TENANT` | мемориал «Бабушка» |
+| Владелец и модераторы | `VIEW` | `ITEM` | пост «Черновик письма» |
 
 ---
 
@@ -264,4 +302,3 @@ erDiagram
 
 - **Журнал безопасности** (решение 29) — описание и таблицы отдельно, по частям.
 - **История видимости** (`VisibilityDecision`) — отложено, открытый вопрос 16 в `Access.md`.
-- **Права аудиторий** лежат в общей таблице `permission` с пометкой `AUDIENCE`; вопрос 41 ещё не закрыт.
