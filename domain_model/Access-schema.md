@@ -7,10 +7,11 @@
 - **бэк-сервис** (gefest) — всё остальное: профиль, роли и права, мемориалы.
 
 Соглашения — как в существующих миграциях бэк-сервиса (`0001-content-schema.sql`):
-- `id` — `uuid`, по умолчанию `uuidv7()`.
-- Служебные поля у каждой таблицы бэк-сервиса, на схемах не показаны: `version`, `created_at`, `updated_at`, `created_by_person_id`, `updated_by_person_id` (→ `person_profile`), `created_via`, `updated_via` — канал: `SITE` / `TELEGRAM_BOT` / `VK_BOT` (решение 12а), `deleted_at`.
+- У каждой таблицы `id` — `uuid`, по умолчанию `uuidv7()`. Все ссылки между таблицами — по `id`.
+- У ролей и прав, кроме `id`, есть постоянный уникальный `code` (`OWNER`, `INVITE`): по нему роль или право ищет программа (решение 36).
+- Служебные поля у каждой таблицы бэк-сервиса, на схемах не показаны: `version`, `created_at`, `updated_at`, `created_by_person_id`, `updated_by_person_id` (→ `person_profile.id`), `created_via`, `updated_via` — канал: `SITE` / `TELEGRAM_BOT` / `VK_BOT` (решение 12а), `deleted_at`.
 - Таблицы мемориала содержат `tenant_id`, база прячет их строки от других мемориалов (RLS, ADR 0009). Ссылки внутри мемориала — составные (`tenant_id`, `x_id`): на запись чужого мемориала сослаться нельзя.
-- Как читать схему: `||--o{` — «один ко многим», `|o--o{` — «необязательно, один ко многим».
+- Как читать схему: `||--o{` — «один ко многим», `|o--o{` — «необязательно, один ко многим»; `PK` — ключ строки, `FK` — ссылка, `UK` — уникальное значение.
 
 ---
 
@@ -42,17 +43,17 @@ erDiagram
         timestamptz closed_at "нажали Выйти"
     }
     oauth2_authorization {
-        text id PK "таблица Spring Authorization Server"
+        text id PK "задаёт Spring Authorization Server"
         uuid auth_session_id FK "наш столбец"
     }
 ```
 
 | Таблица | Что хранит | Правила |
 |---|---|---|
-| `person` | Номер человека. Этот же номер — ключ профиля в бэк-сервисе | |
+| `person` | Номер человека. Этот же номер — `id` профиля в бэк-сервисе | |
 | `auth_identity` | Способ входа: VK или Telegram | Один и тот же VK — только у одного человека среди действующих: уникально (`provider`, `external_id`) где `deleted_at is null` (решения 5, 27). Нельзя отвязать последний способ входа — вопрос 46, не решён |
 | `auth_session` | Главный вход | Час без продлений — вход закрыт (решения 4, 31) |
-| `oauth2_authorization` | Пропуск (5 минут) и ключ продления (час), выданные бэк-сервису для сайта мемориала. Стандартная таблица Spring Authorization Server | Наш столбец `auth_session_id`: «Выйти» закрывает все ключи этого входа, продление обновляет `auth_session.last_activity_at` (решение 31) |
+| `oauth2_authorization` | Пропуск (5 минут) и ключ продления (час), выданные бэк-сервису для сайта мемориала. Стандартная таблица Spring Authorization Server: её `id` — строка с UUID, задаёт Spring | Наш столбец `auth_session_id`: «Выйти» закрывает все ключи этого входа, продление обновляет `auth_session.last_activity_at` (решение 31) |
 
 ---
 
@@ -67,31 +68,34 @@ erDiagram
     role ||--o{ platform_role_assignment : "выдана"
     person_profile ||--o{ platform_role_assignment : "получил"
     person_profile {
-        uuid person_id PK "номер из сервиса авторизации"
+        uuid id PK "номер из сервиса авторизации"
         text display_name "из VK или Telegram"
         text avatar_url
         text public_contact "заполняет сам"
     }
     role {
-        text code PK "OWNER"
+        uuid id PK
+        text code UK "OWNER"
         text scope "PLATFORM / MEMORIAL"
         text title "Владелец"
         text description
     }
     permission {
-        text code PK "INVITE"
+        uuid id PK
+        text code UK "INVITE"
         text scope "PLATFORM / MEMORIAL / AUDIENCE"
         text title "Приглашать участников"
         text description
     }
     role_permission {
-        text role_code FK "MODERATOR"
-        text permission_code FK "INVITE"
+        uuid id PK
+        uuid role_id FK "MODERATOR"
+        uuid permission_id FK "INVITE"
     }
     platform_role_assignment {
         uuid id PK
         uuid person_id FK "Кира"
-        text role_code FK "ADMIN"
+        uuid role_id FK "ADMIN"
         timestamptz revoked_at
         uuid revoked_by_person_id
     }
@@ -99,11 +103,11 @@ erDiagram
 
 | Таблица | Что хранит | Правила |
 |---|---|---|
-| `person_profile` | Профиль: имя, аватар, публичный контакт (решение 34) | Создаётся при первом входе; имя и аватар обновляются при каждом входе. Удаление аккаунта — имя «Удалённый пользователь», `deleted_at` |
-| `role` | Справочник ролей: `ADMIN` (платформа); `OWNER`, `MODERATOR`, `MEMBER` (мемориал) | Код постоянный, название можно менять; роли, о которых знает программа, создаёт миграция (решение 36) |
+| `person_profile` | Профиль: имя, аватар, публичный контакт (решение 34). `id` — номер человека из сервиса авторизации | Создаётся при первом входе; имя и аватар обновляются при каждом входе. Удаление аккаунта — имя «Удалённый пользователь», `deleted_at` |
+| `role` | Справочник ролей: `ADMIN` (платформа); `OWNER`, `MODERATOR`, `MEMBER` (мемориал) | `code` постоянный и уникальный, название можно менять. Роли, о которых знает программа, создаёт миграция — с постоянным `id`, одинаковым во всех базах (решение 36) |
 | `permission` | Справочник прав: платформы (`VIEW_ALL_MEMORIALS`, `SUSPEND_MEMORIAL`, `HIDE_POST`), ролей мемориала (`VIEW_ALL`, `INVITE`, `MANAGE_AUDIENCES`, `MODERATE_POSTS`, `MANAGE_MODERATORS`), аудиторий (`VIEW`, `CONTRIBUTE`, `DOWNLOAD_ORIGINALS`) | Так же, как у ролей |
-| `role_permission` | Какие права входят в роль: `MODERATOR` → `INVITE` | Пометки роли и права совпадают: в роль мемориала — только права мемориала, права аудиторий — ни в одну роль. Проверяет код при записи |
-| `platform_role_assignment` | Кому выдана роль платформы: Кира → `ADMIN` | Только роли с пометкой `PLATFORM` — проверяет код при записи. Одна действующая выдача роли человеку: уникально (`person_id`, `role_code`) где `revoked_at is null` |
+| `role_permission` | Какие права входят в роль: `MODERATOR` → `INVITE` | Уникально (`role_id`, `permission_id`). Пометки роли и права совпадают: в роль мемориала — только права мемориала, права аудиторий — ни в одну роль. Проверяет код при записи |
+| `platform_role_assignment` | Кому выдана роль платформы: Кира → `ADMIN` | Только роли с пометкой `PLATFORM` — проверяет код при записи. Одна действующая выдача роли человеку: уникально (`person_id`, `role_id`) где `revoked_at is null` |
 
 ---
 
@@ -129,7 +133,8 @@ erDiagram
         boolean search_indexing
     }
     tenant_host {
-        text host PK "vostok.у-истока.рф"
+        uuid id PK
+        text host UK "vostok.у-истока.рф"
         uuid tenant_id FK
         boolean is_primary
         timestamptz verified_at "свой домен подтверждён"
@@ -138,7 +143,7 @@ erDiagram
         uuid id PK
         uuid tenant_id FK
         uuid person_id FK "Петя"
-        text role_code FK "MODERATOR"
+        uuid role_id FK "MODERATOR"
         uuid invitation_id FK "как попал"
         uuid access_request_id FK "как попал"
         timestamptz revoked_at
@@ -164,18 +169,18 @@ erDiagram
         timestamptz decided_at
     }
     person_profile {
-        uuid person_id PK
+        uuid id PK
     }
     role {
-        text code PK
+        uuid id PK
     }
 ```
 
 | Таблица | Что хранит | Правила |
 |---|---|---|
 | `tenant` (есть) | Мемориал | Новые поля: `access_contact_person_id` — хранитель (раздел 8.3 `Access.md`), `search_indexing`. `status = SUSPENDED` — приостановлен администратором (решение 21) |
-| `tenant_host` (есть) | Адрес мемориала | Новое поле `verified_at`. Без `tenant_id`-изоляции: по нему мемориал и определяется |
-| `membership` | Участник и его роль в мемориале: Петя → `MODERATOR` | Только роли с пометкой `MEMORIAL` — проверяет код при записи. Один действующий участник на человека: уникально (`tenant_id`, `person_id`) где `revoked_at is null`. Владелец один: уникально (`tenant_id`) где `role_code = 'OWNER'` и `revoked_at is null` (решения 13, 36). Окончание — только `revoked_at` (решение 26). У создателя `invitation_id` и `access_request_id` пусты |
+| `tenant_host` (есть) | Адрес мемориала | Сейчас ключ — `host`; добавляем `id`, `host` остаётся уникальным. Новое поле `verified_at`. Без изоляции по мемориалу: по этой таблице мемориал и определяется |
+| `membership` | Участник и его роль в мемориале: Петя → `MODERATOR` | Только роли с пометкой `MEMORIAL` — проверяет код при записи. Один действующий участник на человека: уникально (`tenant_id`, `person_id`) где `revoked_at is null`. Владелец один: уникально (`tenant_id`) где `role_id` — `id` роли `OWNER` (постоянный, его задаёт миграция) и `revoked_at is null` (решения 13, 36). Окончание — только `revoked_at` (решение 26). У создателя `invitation_id` и `access_request_id` пусты |
 | `invitation` | Ссылка-приглашение | Принявший получает роль `MEMBER`. Срок по умолчанию 7 дней (решение 30) |
 | `access_request` | Заявка на доступ | Одна нерассмотренная заявка на человека: уникально (`tenant_id`, `person_id`) где `status = 'PENDING'` (решение 30) |
 
@@ -200,6 +205,7 @@ erDiagram
         int position
     }
     audience_membership {
+        uuid id PK
         uuid tenant_id FK
         uuid audience_id FK "Семья"
         uuid membership_id FK "Петя"
@@ -208,11 +214,12 @@ erDiagram
         uuid id PK
         uuid tenant_id FK
         uuid audience_id FK "Семья"
-        text permission_code FK "VIEW"
+        uuid permission_id FK "VIEW"
         text object_type "TENANT / SECTION / ITEM / SUBJECT / APPEARANCE / TRIBUTE"
         uuid object_id "раздел Детство"
     }
     invitation_audience {
+        uuid id PK
         uuid tenant_id FK
         uuid invitation_id FK
         uuid audience_id FK
@@ -221,7 +228,7 @@ erDiagram
         uuid id PK
     }
     permission {
-        text code PK
+        uuid id PK
     }
     invitation {
         uuid id PK
@@ -231,9 +238,9 @@ erDiagram
 | Таблица | Что хранит | Правила |
 |---|---|---|
 | `audience` | Аудитория: «Семья», «Друзья» и системные «Все» (`EVERYONE`), «Все участники» (`MEMBERS`), «Владелец и модераторы» (`OWNER_AND_MODERATORS`) | Системные есть у каждого мемориала, их состав вычисляется. Одна системная каждого вида: уникально (`tenant_id`, `system_code`) |
-| `audience_membership` | Кто входит в свою аудиторию: Петя в «Семье» | Ссылается на участие, а не на человека (решение 24): отозвали участие — человек выпал из аудиторий. Только для своих аудиторий, состав системных не хранится |
-| `access_grant` | Что аудитории разрешено на объект: «Семья — `VIEW` — раздел „Детство“» | Только права с пометкой `AUDIENCE` — проверяет код при записи. Уникально (`audience_id`, `permission_code`, `object_type`, `object_id`) где `deleted_at is null`. `object_id` проверяет приложение. Черновик — выдача `VIEW` аудитории «Владелец и модераторы», и она не сочетается с другими (решение 38). «Всем» нельзя `CONTRIBUTE` и `DOWNLOAD_ORIGINALS` (решение 17). `DOWNLOAD_ORIGINALS` — только на мемориал (решение 39) |
-| `invitation_audience` | В какие аудитории попадёт принявший приглашение (решение 25) | Удаляется вместе с аудиторией |
+| `audience_membership` | Кто входит в свою аудиторию: Петя в «Семье» | Уникально (`audience_id`, `membership_id`). Ссылается на участие, а не на человека (решение 24): отозвали участие — человек выпал из аудиторий. Только для своих аудиторий, состав системных не хранится |
+| `access_grant` | Что аудитории разрешено на объект: «Семья — `VIEW` — раздел „Детство“» | Только права с пометкой `AUDIENCE` — проверяет код при записи. Уникально (`audience_id`, `permission_id`, `object_type`, `object_id`) где `deleted_at is null`. `object_id` проверяет приложение. Черновик — выдача `VIEW` аудитории «Владелец и модераторы», и она не сочетается с другими (решение 38). «Всем» нельзя `CONTRIBUTE` и `DOWNLOAD_ORIGINALS` (решение 17). `DOWNLOAD_ORIGINALS` — только на мемориал (решение 39) |
+| `invitation_audience` | В какие аудитории попадёт принявший приглашение (решение 25) | Уникально (`invitation_id`, `audience_id`). Удаляется вместе с аудиторией |
 
 Кроме того, у `media_asset` (есть) новое поле `original_closed` — «Оригинал закрыт», по умолчанию `false` (решение 39).
 
