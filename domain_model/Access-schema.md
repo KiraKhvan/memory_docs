@@ -10,7 +10,7 @@
 - У каждой таблицы `id` — `uuid`, по умолчанию `uuidv7()`. Все ссылки между таблицами — по `id`.
 - Исключение из правила `uuid` — таблицы, которые создают фреймворки (`spring_session`, `oauth2_authorization`): их устройство задаёт фреймворк.
 - У ролей и прав, кроме `id`, есть постоянный уникальный `code` (`OWNER`, `INVITE`): по нему роль или право ищет программа (решение 36).
-- Служебные поля у каждой таблицы бэк-сервиса, на схемах не показаны: `version`, `created_at`, `updated_at`, `created_by_person_id`, `updated_by_person_id` (→ `person_profile.id`), `created_via`, `updated_via` — канал: `SITE` / `TELEGRAM_BOT` / `VK_BOT` (решение 12а), `deleted_at`.
+- Служебные поля у каждой таблицы бэк-сервиса, на схемах не показаны: `version`, `created_at`, `updated_at`, `created_by_person_id`, `updated_by_person_id` (→ `person_profile.id`), `created_via_channel_id`, `updated_via_channel_id` (→ `channel.id`) — канал: сайт, бот Telegram, бот VK (решения 12а, 51), `deleted_at`.
 - Таблицы мемориала содержат `tenant_id`, база прячет их строки от других мемориалов (RLS, ADR 0009). Ссылки внутри мемориала — составные (`tenant_id`, `x_id`): на запись чужого мемориала сослаться нельзя.
 - Как читать схему: `||--o{` — «один ко многим», `|o--o{` — «необязательно, один ко многим»; `PK` — ключ строки, `FK` — ссылка, `UK` — уникальное значение. Таблица из другого раздела показана коротко — только нужные столбцы, полностью — в своём разделе.
 
@@ -68,18 +68,14 @@ erDiagram
 
 Таблицы платформы — без `tenant_id`, не принадлежат ни одному мемориалу.
 
+**Роли, права и каналы**
+
 ```mermaid
 erDiagram
     role ||--o{ role_permission : "в роль входят"
     permission ||--o{ role_permission : "входит в роли"
-    role ||--o{ platform_role_assignment : "выдана"
-    person_profile ||--o{ platform_role_assignment : "получил"
-    person_profile {
-        uuid id PK "номер из сервиса аутентификации"
-        text display_name "из VK или Telegram"
-        text avatar_url
-        text public_contact "заполняет сам"
-    }
+    channel ||--o{ channel_permission : "права канала"
+    permission ||--o{ channel_permission : "действует через канал"
     role {
         uuid id PK
         text code UK "OWNER"
@@ -99,6 +95,30 @@ erDiagram
         uuid role_id FK "MODERATOR"
         uuid permission_id FK "INVITE"
     }
+    channel {
+        uuid id PK
+        text code UK "TELEGRAM_BOT"
+        text title "Бот Telegram"
+    }
+    channel_permission {
+        uuid id PK
+        uuid channel_id FK "TELEGRAM_BOT"
+        uuid permission_id FK "VIEW_ALL"
+    }
+```
+
+**Профиль и роли платформы**
+
+```mermaid
+erDiagram
+    person_profile ||--o{ platform_role_assignment : "получил"
+    role ||--o{ platform_role_assignment : "выдана"
+    person_profile {
+        uuid id PK "номер из сервиса аутентификации"
+        text display_name "из VK или Telegram"
+        text avatar_url
+        text public_contact "заполняет сам"
+    }
     platform_role_assignment {
         uuid id PK
         uuid person_id FK "Кира"
@@ -106,15 +126,22 @@ erDiagram
         timestamptz revoked_at
         uuid revoked_by_person_id
     }
+    role {
+        uuid id PK "полностью — выше"
+        text code UK "ADMIN"
+        text scope "PLATFORM"
+    }
 ```
 
 | Таблица | Что хранит | Правила |
 |---|---|---|
 | `person_profile` | Профиль: имя, аватар, публичный контакт (решение 34). `id` — номер человека из сервиса аутентификации | Создаётся при первом входе; имя и аватар обновляются при каждом входе. Удаление аккаунта — имя «Удалённый пользователь», `deleted_at` |
 | `role` | Справочник ролей: `ADMIN` (платформа); `OWNER`, `MODERATOR`, `MEMBER` (мемориал) | `code` постоянный и уникальный, название можно менять. Роли, о которых знает программа, создаёт миграция — с постоянным `id`, одинаковым во всех базах (решение 36) |
-| `permission` | Справочник прав: платформы (`VIEW_ALL_MEMORIALS`, `SUSPEND_MEMORIAL`, `HIDE_POST`), ролей мемориала (`VIEW_ALL`, `INVITE`, `MANAGE_AUDIENCES`, `MODERATE_POSTS`, `MANAGE_MODERATORS`), аудиторий (`VIEW`, `CONTRIBUTE`, `WRITE_TRIBUTE`, `DOWNLOAD_ORIGINALS`) | Так же, как у ролей |
+| `permission` | Справочник прав: платформы (`VIEW_ALL_MEMORIALS`, `SUSPEND_MEMORIAL`, `HIDE_POST`, `RAISE_MEMORIAL_LIMIT`), ролей мемориала (`VIEW_ALL`, `INVITE`, `MANAGE_AUDIENCES`, `MODERATE_POSTS`, `MANAGE_MODERATORS`, `DOWNLOAD_ALL_ORIGINALS`, `APPROVE_REQUESTS`, `REMOVE_MEMBERS`, `MANAGE_SETTINGS`, `MODERATE_TRIBUTES`), аудиторий (`VIEW`, `CONTRIBUTE`, `WRITE_TRIBUTE`, `DOWNLOAD_ORIGINALS`). Право на каждое правило — решение 49 | Так же, как у ролей |
 | `role_permission` | Какие права входят в роль: `MODERATOR` → `INVITE` | Уникально (`role_id`, `permission_id`). Пометки роли и права совпадают: в роль мемориала — только права мемориала, права аудиторий — ни в одну роль. Проверяет код при записи |
 | `platform_role_assignment` | Кому выдана роль платформы: Кира → `ADMIN` | Только роли с пометкой `PLATFORM` — проверяет код при записи. Одна действующая выдача роли человеку: уникально (`person_id`, `role_id`) где `revoked_at is null` |
+| `channel` | Справочник каналов, через которые человек действует: `SITE` — сайт, `TELEGRAM_BOT`, `VK_BOT` — наши боты (решение 51). Канал записывает в пропуск сервис аутентификации (решение 32) | `code` постоянный и уникальный; строки создаёт миграция с постоянным `id`. Новый мессенджер — новая строка |
+| `channel_permission` | Какие права действуют через канал: бот Telegram → `VIEW_ALL` | Уникально (`channel_id`, `permission_id`). Сайту — все права; ботам — только права ролей мемориала из решения 51. Новое право сайту добавляет та же миграция, что его создаёт; ботам — только отдельным решением |
 
 ---
 
