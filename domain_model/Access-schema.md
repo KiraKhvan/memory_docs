@@ -197,6 +197,7 @@ erDiagram
     membership ||--o{ audience_membership : "входит в"
     audience ||--o{ access_grant : "получила"
     permission ||--o{ access_grant : "право"
+    object_type ||--o{ access_grant : "тип объекта"
     invitation ||--o{ invitation_audience : "куда попадёт"
     audience ||--o{ invitation_audience : "в приглашениях"
     audience {
@@ -218,7 +219,7 @@ erDiagram
         uuid tenant_id FK
         uuid audience_id FK "Семья"
         uuid permission_id FK "VIEW"
-        text object_type "TENANT / SECTION / ITEM / SUBJECT / APPEARANCE / TRIBUTE"
+        uuid object_type_id FK "SECTION"
         uuid object_id "раздел Детство"
     }
     invitation_audience {
@@ -226,6 +227,11 @@ erDiagram
         uuid tenant_id FK
         uuid invitation_id FK
         uuid audience_id FK
+    }
+    object_type {
+        uuid id PK
+        text code UK "SECTION"
+        text title "Раздел"
     }
     membership {
         uuid id PK "полностью — раздел 3"
@@ -246,7 +252,8 @@ erDiagram
 |---|---|---|
 | `audience` | Аудитория: «Семья», «Друзья» и системные «Все» (`EVERYONE`), «Все участники» (`MEMBERS`), «Владелец и модераторы» (`OWNER_AND_MODERATORS`) | Системные есть у каждого мемориала, их состав вычисляется. Одна системная каждого вида: уникально (`tenant_id`, `system_code`) |
 | `audience_membership` | Кто входит в свою аудиторию: Петя в «Семье» | Уникально (`audience_id`, `membership_id`). Ссылается на участие, а не на человека (решение 24): отозвали участие — человек выпал из аудиторий. Только для своих аудиторий, состав системных не хранится |
-| `access_grant` | Что аудитории разрешено на объект: «Семья — `VIEW` — раздел „Детство“» | Только права с пометкой `AUDIENCE` — проверяет код при записи. Уникально (`audience_id`, `permission_id`, `object_type`, `object_id`) где `deleted_at is null`. `object_id` проверяет приложение. Черновик — выдача `VIEW` аудитории «Владелец и модераторы», и она не сочетается с другими (решение 38). «Всем» нельзя `CONTRIBUTE` и `DOWNLOAD_ORIGINALS` (решение 17). `DOWNLOAD_ORIGINALS` — только на мемориал (решение 39) |
+| `object_type` | Справочник типов объектов, на которые выдаются права: `TENANT` — мемориал, `SECTION` — раздел, `ITEM` — пост, `SUBJECT` — человек мемориала, `APPEARANCE` — оформление, `TRIBUTE` — запись памятной книги. Общий для всех мемориалов, без `tenant_id` | `code` постоянный и уникальный. Типы, о которых знает программа, создаёт миграция с постоянным `id` |
+| `access_grant` | Что аудитории разрешено на объект: «Семья — `VIEW` — раздел „Детство“» | Только права с пометкой `AUDIENCE` — проверяет код при записи. Уникально (`audience_id`, `permission_id`, `object_type_id`, `object_id`) где `deleted_at is null`. `object_id` проверяет приложение. Черновик — выдача `VIEW` аудитории «Владелец и модераторы», и она не сочетается с другими (решение 38). «Всем» нельзя `CONTRIBUTE` и `DOWNLOAD_ORIGINALS` (решение 17). `DOWNLOAD_ORIGINALS` — только на мемориал (решение 39) |
 | `invitation_audience` | В какие аудитории попадёт принявший приглашение (решение 25) | Уникально (`invitation_id`, `audience_id`). Удаляется вместе с аудиторией |
 
 Кроме того, у `media_asset` (есть) новое поле `original_closed` — «Оригинал закрыт», по умолчанию `false` (решение 39).
