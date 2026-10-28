@@ -137,11 +137,11 @@ erDiagram
 |---|---|---|
 | `person_profile` | Профиль: имя, аватар, публичный контакт (решение 34). `id` — номер человека из сервиса аутентификации | Создаётся при первом входе; имя и аватар обновляются при каждом входе. Удаление аккаунта — имя «Удалённый пользователь», `deleted_at` |
 | `role` | Справочник ролей: `ADMIN` (платформа); `OWNER`, `MODERATOR`, `MEMBER` (мемориал) | `code` постоянный и уникальный, название можно менять. Роли, о которых знает программа, создаёт миграция — с постоянным `id`, одинаковым во всех базах (решение 36) |
-| `permission` | Справочник прав: платформы (`VIEW_ALL_MEMORIALS`, `SUSPEND_MEMORIAL`, `HIDE_POST`, `RAISE_MEMORIAL_LIMIT`), ролей мемориала (`VIEW_ALL`, `INVITE`, `MANAGE_AUDIENCES`, `MODERATE_POSTS`, `MANAGE_MODERATORS`, `DOWNLOAD_ALL_ORIGINALS`, `APPROVE_REQUESTS`, `REMOVE_MEMBERS`, `MANAGE_SETTINGS`, `MODERATE_TRIBUTES`), аудиторий (`VIEW`, `CONTRIBUTE`, `WRITE_TRIBUTE`, `DOWNLOAD_ORIGINALS`). Право на каждое правило — решение 49 | Так же, как у ролей |
-| `role_permission` | Какие права входят в роль: `MODERATOR` → `INVITE` | Уникально (`role_id`, `permission_id`). Пометки роли и права совпадают: в роль мемориала — только права мемориала, права аудиторий — ни в одну роль. Проверяет код при записи |
+| `permission` | Справочник прав: платформы (`VIEW_ALL_MEMORIALS`, `SUSPEND_MEMORIAL`, `HIDE_POST`, `RAISE_MEMORIAL_LIMIT`), ролей мемориала (`VIEW_ALL`, `INVITE`, `MANAGE_AUDIENCES`, `MODERATE_POSTS`, `MANAGE_CONTENT`, `MANAGE_MODERATORS`, `DOWNLOAD_ALL_ORIGINALS`, `APPROVE_REQUESTS`, `REMOVE_MEMBERS`, `MANAGE_SETTINGS`, `MODERATE_TRIBUTES`), аудиторий (`VIEW`, `CONTRIBUTE`, `WRITE_TRIBUTE`, `DOWNLOAD_ORIGINALS`). Право на каждое правило — решение 49; что даёт каждое и у кого — [«Все права» в `Access.md`](Access.md#все-права) | Так же, как у ролей |
+| `role_permission` | Какие права входят в роль: `MODERATOR` → `INVITE`; полностью — [«Все права» в `Access.md`](Access.md#все-права) | Уникально (`role_id`, `permission_id`). Пометки роли и права совпадают: в роль мемориала — только права мемориала, права аудиторий — ни в одну роль. Проверяет код при записи |
 | `platform_role_assignment` | Кому выдана роль платформы: Кира → `ADMIN` | Только роли с пометкой `PLATFORM` — проверяет код при записи. Одна действующая выдача роли человеку: уникально (`person_id`, `role_id`) где `revoked_at is null` |
 | `channel` | Справочник каналов, через которые человек действует: `SITE` — сайт, `TELEGRAM_BOT`, `VK_BOT` — наши боты (решение 51). Канал записывает в пропуск сервис аутентификации (решение 32) | `code` постоянный и уникальный; строки создаёт миграция с постоянным `id`. Новый мессенджер — новая строка |
-| `channel_permission` | Какие права действуют через канал: бот Telegram → `VIEW_ALL` | Уникально (`channel_id`, `permission_id`). Сайту — все права; ботам — только права ролей мемориала из решения 51. Новое право сайту добавляет та же миграция, что его создаёт; ботам — только отдельным решением |
+| `channel_permission` | Какие права действуют через канал: бот Telegram → `VIEW_ALL`; полностью — [«Все права» в `Access.md`](Access.md#все-права) | Уникально (`channel_id`, `permission_id`). Сайту — все права; ботам — только права ролей мемориала из решения 51. Новое право сайту добавляет та же миграция, что его создаёт; ботам — только отдельным решением |
 
 ---
 
@@ -309,7 +309,7 @@ erDiagram
     }
 ```
 
-**Права аудиторий** — строки `permission` с `scope = AUDIENCE`, их создаёт миграция:
+**Права аудиторий** — строки `permission` с `scope = AUDIENCE`, их создаёт миграция (все права модели — [«Все права» в `Access.md`](Access.md#все-права)):
 
 | `code` | `title` | Правила |
 |---|---|---|
