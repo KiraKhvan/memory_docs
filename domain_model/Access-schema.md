@@ -24,7 +24,7 @@
 erDiagram
     person ||--o{ auth_identity : "способы входа"
     person ||--o{ spring_session : "principal_name"
-    spring_session ||--o{ oauth2_authorization : "session_id"
+    spring_session ||--o{ oauth2_authorization : "сессия в атрибутах"
     person {
         uuid id PK
         timestamptz created_at
@@ -49,7 +49,7 @@ erDiagram
     oauth2_authorization {
         text id PK "таблица Spring Authorization Server"
         text principal_name "person.id"
-        text session_id "наш столбец"
+        text attributes "сессия, от которой выдан ключ"
     }
 ```
 
@@ -58,7 +58,7 @@ erDiagram
 | `person` | Номер человека. Этот же номер — `id` профиля в бэк-сервисе | |
 | `auth_identity` | Способ входа: VK или Telegram | Один и тот же VK — только у одного человека среди действующих: уникально (`provider`, `external_id`) где `deleted_at is null` (решения 5, 27). Последний способ входа отвязать нельзя. Новый привязывается только из своей открытой сессии входом через него — ещё одна строка с тем же `person_id` (решение 46) |
 | `spring_session` | Главный вход — сессия браузера на `auth.у-истока.рф`. Таблицу (и `spring_session_attributes`) создаёт Spring Session | `principal_name` — `person.id` (текст, не внешний ключ). Час без активности — вход закрыт (решения 4, 31). Продление пропуска в любом мемориале обновляет `last_access_time` этой сессии |
-| `oauth2_authorization` | Пропуск (JWT, 5 минут) и ключ продления (час, новый при каждом продлении), выданные бэк-сервису для сайта мемориала; пропуска бота. Стандартная таблица Spring Authorization Server | `principal_name` — `person.id`. Наш столбец `session_id` — сессия Spring, от которой выданы ключи: «Выйти» удаляет сессию и все ключи с её `session_id` (решения 4, 31) |
+| `oauth2_authorization` | Пропуск (JWT, 5 минут) и ключ продления (час, новый при каждом продлении), выданные бэк-сервису для сайта мемориала; пропуска бота. Стандартная таблица Spring Authorization Server | `principal_name` — `person.id`. От какой главной сессии выдан ключ — в стандартных атрибутах авторизации, своих столбцов в таблице нет (решение 55). Продление проверяет, что главная сессия жива, и продлевает её; «Выйти» закрывает главную сессию — следующее продление не проходит (решения 4, 31) |
 
 Не нужны: `oauth2_registered_client` — клиентов два (бэк-сервис и бот), они в настройках; `oauth2_authorization_consent` — экрана согласия нет.
 
