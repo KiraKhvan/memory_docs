@@ -484,7 +484,7 @@ erDiagram
 | `revokedAt`, `revokedByPersonId` | Отзыв ссылки — право `INVITE` (решение 65). Окончание — только отзывом, `deletedAt` не ставится (решение 26) |
 | `version`, `createdAt`, `updatedAt`, `createdByPersonId`, `updatedByPersonId`, `createdViaChannelId`, `updatedViaChannelId`, `deletedAt` | Служебные поля, см. раздел 1 |
 
-В какие аудитории войдёт принявший — `InvitationAudience`. Приглашение даёт роль участника (`MEMBER`); модератором участника назначает владелец (решение 13).
+В какие аудитории войдёт принявший — `InvitationAudience`; указать можно любую аудиторию, для системных это ничего не меняет (решение 71). Приглашение даёт роль участника (`MEMBER`); модератором участника назначает владелец (решение 13).
 
 ### InvitationAudience
 
