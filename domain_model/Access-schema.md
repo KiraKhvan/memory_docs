@@ -140,7 +140,7 @@ erDiagram
 |---|---|---|
 | `person_profile` | Профиль: имя, аватар, публичный контакт (решение 34). `id` — номер человека из сервиса аутентификации | Создаётся, когда бэк-сервис впервые видит пропуск человека — из любого канала (решение 53); имя и аватар — у сервиса аутентификации, бэк-сервис получает их по пропуску и обновляет при каждом входе (решение 66). Удаление аккаунта — имя «Удалённый пользователь», `deleted_at` |
 | `role` | Справочник ролей: `ADMIN` (платформа); `OWNER`, `MODERATOR`, `MEMBER` (мемориал) | `code` постоянный и уникальный, название можно менять. Роли, о которых знает программа, создаёт миграция — с постоянным `id`, одинаковым во всех базах (решение 36) |
-| `permission` | Справочник прав: платформы (`VIEW_ALL_MEMORIALS`, `SUSPEND_MEMORIAL`, `HIDE_POST`, `RAISE_MEMORIAL_LIMIT`, `MANAGE_PLATFORM_ROLES`), ролей мемориала (`VIEW_ALL`, `INVITE`, `MANAGE_AUDIENCES`, `MODERATE_POSTS`, `MANAGE_POSTS`, `MANAGE_STRUCTURE`, `MANAGE_MODERATORS`, `DOWNLOAD_ALL_ORIGINALS`, `APPROVE_REQUESTS`, `REMOVE_MEMBERS`, `MANAGE_SETTINGS`, `MODERATE_TRIBUTES`, `OPEN_TO_EVERYONE`), аудиторий (`VIEW`, `CONTRIBUTE`, `WRITE_TRIBUTE`, `DOWNLOAD_ORIGINALS`). Право на каждое правило — решение 49; что даёт каждое и у кого — [«Все права» в `Access.md`](Access.md#все-права) | Так же, как у ролей |
+| `permission` | Справочник прав: платформы (`VIEW_ALL_MEMORIALS`, `SUSPEND_MEMORIAL`, `HIDE_POST`, `RAISE_MEMORIAL_LIMIT`, `MANAGE_PLATFORM_ROLES`, `ASSIGN_OWNER`), ролей мемориала (`VIEW_ALL`, `INVITE`, `MANAGE_AUDIENCES`, `MODERATE_POSTS`, `MANAGE_POSTS`, `MANAGE_STRUCTURE`, `MANAGE_MODERATORS`, `DOWNLOAD_ALL_ORIGINALS`, `APPROVE_REQUESTS`, `REMOVE_MEMBERS`, `MANAGE_SETTINGS`, `MODERATE_TRIBUTES`, `OPEN_TO_EVERYONE`), аудиторий (`VIEW`, `CONTRIBUTE`, `WRITE_TRIBUTE`, `DOWNLOAD_ORIGINALS`). Право на каждое правило — решение 49; что даёт каждое и у кого — [«Все права» в `Access.md`](Access.md#все-права) | Так же, как у ролей |
 | `role_permission` | Какие права входят в роль: `MODERATOR` → `INVITE`; полностью — [«Все права» в `Access.md`](Access.md#все-права) | Уникально (`role_id`, `permission_id`). Пометки роли и права совпадают: в роль мемориала — только права мемориала, права аудиторий — ни в одну роль. Проверяет код при записи |
 | `platform_role_assignment` | Кому выдана роль платформы: Кира → `ADMIN` | Только роли с пометкой `PLATFORM` — проверяет код при записи. Одна действующая выдача роли человеку: уникально (`person_id`, `role_id`) где `revoked_at is null`. Назначает и снимает тот, у кого `MANAGE_PLATFORM_ROLES` (решение 65) |
 | `channel` | Справочник каналов, через которые человек действует: `SITE` — сайт, `TELEGRAM_BOT`, `VK_BOT` — наши боты (решение 51). Канал записывает в пропуск сервис аутентификации (решение 32) | `code` постоянный и уникальный; строки создаёт миграция с постоянным `id`. Новый мессенджер — новая строка |
@@ -354,9 +354,114 @@ erDiagram
 
 ---
 
+## 6. Журнал безопасности
+
+Два журнала, по месту событий (решения 29, 74): в бэк-сервисе — `security_event`, в сервисе аутентификации — `auth_event`.
+
+**Бэк-сервис**
+
+```mermaid
+erDiagram
+    person_profile ||--o{ security_event : "кто"
+    channel ||--o{ security_event : "через что"
+    tenant |o--o{ security_event : "в каком мемориале"
+    security_event {
+        uuid id PK
+        uuid tenant_id FK "пусто — событие платформы"
+        timestamptz occurred_at
+        uuid person_id FK "пусто — система"
+        uuid channel_id FK
+        text event_type "ACCESS_GRANTED"
+        text object_type "AUDIENCE"
+        uuid object_id
+        jsonb details "что было и что стало"
+    }
+    person_profile {
+        uuid id PK "полностью — раздел 2"
+    }
+    channel {
+        uuid id PK "полностью — раздел 2"
+        text code UK
+    }
+    tenant {
+        uuid id PK "полностью — раздел 3"
+    }
+```
+
+**Сервис аутентификации**
+
+```mermaid
+erDiagram
+    person ||--o{ auth_event : "кто"
+    auth_event {
+        uuid id PK
+        timestamptz occurred_at
+        uuid person_id FK
+        text channel "SITE / TELEGRAM_BOT / VK_BOT"
+        text event_type "LOGIN"
+        text provider "VK / TELEGRAM"
+        text ip
+        text user_agent
+        jsonb details
+    }
+    person {
+        uuid id PK "полностью — раздел 1"
+    }
+```
+
+| Таблица | Что хранит | Правила |
+|---|---|---|
+| `security_event` | Событие бэк-сервиса: кто, когда, через какой канал, что сделал, с каким объектом, в каком мемориале; `details` — что было и что стало | Только добавление: у роли базы приложения на таблицу только `INSERT` и `SELECT`. Пишется в той же транзакции, что и само изменение (решение 68). Служебных полей нет — событие само говорит, кто и когда. События мемориала — с `tenant_id` под RLS; события платформы (`tenant_id` пусто) видит только администрирование (решение 52) |
+| `auth_event` | Событие сервиса аутентификации | Так же — только добавление. Канал — код, справочника каналов в сервисе аутентификации нет. `ip` и `user_agent` — для расследований; хранить ли их и сколько — открытый вопрос 27 в `Access.md` |
+
+**Что пишем до запуска** (`event_type` — постоянные коды в коде, справочника не нужно):
+
+| Группа | События | Журнал |
+|---|---|---|
+| Вход | `LOGIN`, `LOGOUT`, `IDENTITY_LINKED`, `IDENTITY_UNLINKED`, `ACCOUNT_DELETED` | `auth_event` |
+| Участие | `INVITATION_CREATED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `ACCESS_REQUEST_CREATED`, `ACCESS_REQUEST_APPROVED`, `ACCESS_REQUEST_REJECTED`, `MEMBERSHIP_REVOKED` | `security_event` |
+| Роли и владелец | `ROLE_CHANGED`, `OWNERSHIP_CHANGE_CREATED`, `OWNERSHIP_CHANGED` | `security_event` |
+| Аудитории и права | `AUDIENCE_CREATED`, `AUDIENCE_DELETED`, `AUDIENCE_MEMBER_ADDED`, `AUDIENCE_MEMBER_REMOVED`, `ACCESS_GRANTED`, `ACCESS_REVOKED`, `PUBLICATION_CHANGED` | `security_event` |
+| Платформа | `PLATFORM_ROLE_ASSIGNED`, `PLATFORM_ROLE_REVOKED`, `MEMORIAL_SUSPENDED`, `MEMORIAL_RESUMED`, `POST_HIDDEN_BY_PLATFORM`, `POST_UNHIDDEN_BY_PLATFORM`, `MEMORIAL_LIMIT_RAISED` | `security_event` |
+
+---
+
+## 7. Бэк-сервис: смена владельца
+
+```mermaid
+erDiagram
+    tenant ||--o{ ownership_change : "смены владельца"
+    membership ||--o{ ownership_change : "кандидат"
+    ownership_change {
+        uuid id PK
+        uuid tenant_id FK
+        text kind "TRANSFER / CLAIM"
+        uuid candidate_membership_id FK "кому перейдёт роль"
+        text message "заявка: почему"
+        text status "PENDING / ACCEPTED / REJECTED / CANCELLED"
+        timestamptz owner_notified_at "заявка: когда сообщили владельцу"
+        timestamptz decide_after "заявка: решать не раньше"
+        uuid decided_by_person_id FK
+        timestamptz decided_at
+    }
+    membership {
+        uuid id PK "полностью — раздел 3"
+        uuid person_id FK
+        uuid role_id FK
+    }
+    tenant {
+        uuid id PK "полностью — раздел 3"
+    }
+```
+
+| Таблица | Что хранит | Правила |
+|---|---|---|
+| `ownership_change` | Смена владельца (решение 73): передача владельцем (`TRANSFER`) или заявка участника (`CLAIM`) | Одна нерассмотренная на мемориал: уникально (`tenant_id`) где `status = 'PENDING'`. Кандидат — действующий участник. `TRANSFER` создаёт владелец, принимает или отклоняет кандидат. `CLAIM` создаёт участник; платформа сообщает владельцу (`owner_notified_at`), владелец может отклонить; после `decide_after` — через 30 дней, срок в настройках, — решает администратор (`ASSIGN_OWNER`). Владельца нет (удалил аккаунт) — `decide_after` сразу. Смена — кодом в одной транзакции: прежний владелец, если он ещё участник, становится модератором, кандидат — владельцем, хранитель меняется; событие — в журнал |
+
+---
+
 ## Не вошло
 
-- **Журнал безопасности** (решение 29) — описание и таблицы отдельно, по частям.
 - **История видимости** (`VisibilityDecision`) — отложено, открытый вопрос 16 в `Access.md`.
 - **Собственные домены мемориалов** — отложено (решение 45, открытый вопрос 17 в `Access.md`); вернутся вместе с отметкой о проверке домена `tenant_host.verified_at`.
 - **Согласия на обработку данных** (решения 7, 48) — три отдельных согласия, каждое отдельной записью; таблицы спроектируем, когда дойдём до согласий, — до запуска.
